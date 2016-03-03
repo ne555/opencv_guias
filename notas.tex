@@ -1,0 +1,478 @@
+\documentclass[oneside,a4paper]{book}
+\usepackage[utf8]{inputenc}
+\usepackage{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{hyperref}
+\usepackage{listings}
+\lstset{
+	language=C++,
+	texcl=true
+}
+%\usepackage[a5paper]{geometry}
+
+\title{OpenCV: notas}
+\author{}
+\date{18 de febrero de 2016}
+
+\usepackage{listings}
+\newcommand{\tc}[1]{\texttt{#1}}
+
+\begin{document}
+	\maketitle
+	\tableofcontents
+	%\setcounter{chapter}{-1}
+	\frontmatter
+	\let\theoldsection\thesection
+	\makeatletter
+		\renewcommand\thesection{\@arabic \c@section}
+	\makeatother
+\chapter{Introducción}
+Este documento presenta una reseña de la librería OpenCV para procesamiento de imágenes en C++. Se explica brevemente su instalación, compilación y las funciones fundamentales para cargar una imagen de archivo, obtener información de la misma, visualizarla y otras cuestiones de manejo básico,
+
+La librería y su documentación está disponible en: \url{http://opencv.org/}. En nuestras clases usaremos la versión 2.x. % OO, RAII, estable
+
+	\section{Instalación}
+\noindent\url{http://docs.opencv.org/doc/tutorials/introduction/linux_install/linux_install.html}\\
+\url{http://docs.opencv.org/doc/tutorials/introduction/windows_install/windows_install.html}
+
+Existe un complemento para ZinjaI que contiene la librería en la versión 2.4.10 compilada con MinGW, autocompletado y plantilla de projecto
+\url{http://zinjai.sourceforge.net/}
+
+	\section{Compilación}
+\tc{OpenCV} se divide en módulos según la funcionalidad que estos proveen, por ejemplo el módulo \tc{highgui} permite realizar interfaces gráficas, leer y escribir imágenes a disco y capturar video desde una cámara.
+Para evitar la búsqueda de los módulos correspondientes a las funciones a utilizar, se incluirán todos ellos mediante\\
+\verb|  #include<opencv2/opencv.hpp>| %\verb|#include<opencv/cv.hpp>|
+
+Utilizando el programa \tc{pkg-config} se resolverán las dependencias de \tc{OpenCV} y se enlazará contra \emph{todos} los módulos (no existe penalidad)\\
+\verb|  g++ prog.cpp $(pkg-config --libs opencv) -o prog|
+
+
+	\section{Manejo básico de una imagen}
+\begin{itemize}
+		\item Crear una imagen vacía: \\
+			\verb|  cv::Mat img(filas, columnas, tipo, valor);|\\
+			\verb|  cv::Mat img = cv::Mat::zeros(filas, columnas, tipo);|
+
+			\begin{itemize}
+				\item \tc{valor}: Inicialización de los píxeles, es de tipo \tc{cv::Scalar}.
+				\item \tc{tipo}: Define la forma de representación de la matriz. Se compone de la siguiente manera\\
+					\verb|  CV_[n bits por elemento][signo][prefijo de tipo]C([n de canales])|\\
+					Así, \tc{CV\_8UC(3)} indica que se almacenará la imagen utilizando \tc{unsigned char} de 8 bits, y que cada píxel se define con 3 canales.
+			\end{itemize}
+
+
+			Ejemplos:
+			\begin{itemize}
+				\item \verb|cv::Mat img(640, 480, CV_8UC(1))|: imagen en tonos de grises, inicialmente negra.
+				\item \verb|cv::Mat img(640, 480, CV_8UC(3), cv::Scalar(0,0,255))|: imagen color, inicialmente roja (BGR).
+				\item \verb|Mat C = (Mat_<double>(3,3) << 0, -1, 0, -1, 5, -1, 0, -1, 0)|: imagen de $3\times3$ utilizada como máscara para filtros
+			\end{itemize}
+
+	\item Crear una imagen cargándola de un archivo: \\
+		\verb|  cv::Mat img = cv::imread("archivo.ext");|\\
+		\verb|  cv::Mat img = cv::imread("archivo.ext", CV_LOAD_IMAGE_GRAYSCALE);| (convierte a escala de grises)
+
+	\item Campos de la estructura \tc{Mat}: accesibles a través de las siguientes funciones, mediante la instrucción \tc{img.funcion}:
+		\begin{itemize}
+			\item \tc{columns}: ancho, número de columnas.
+			\item \tc{rows}: alto, número de filas.
+			\item \tc{channels}: dimensión del pixel, número de canales.
+			\item \tc{depth()}: especificación de tipo.
+			\item \tc{at<tipo>(R,C)}: acceso a un píxel, el tipo debe corresponderse con el la matriz.
+			\item \tc{ptr<tipo>(R)}: puntero a una fila, el tipo debe corresponderse con el la matriz.
+		\end{itemize}
+		La matriz se accede desde el elemento (0,0) en la esquina superior izquierda, hasta el elemento (ancho-1,alto-1) en la esquina inferior derecha.
+
+	\item Visualización de una imagen:\\
+		Para mostrar las imágenes es necesario crear ventanas, estas son accedidas luego mediante el nombre:\\
+		\verb|  cv::namedWindow("nombre");|\\
+		\verb|  cv::imshow("nombre", img);|
+		%A una ventana se pueden asociar barras de desplazamiento mediante la función \tc{createTrackbar()}
+
+	\item Grabación de una imagen:\\
+		Para guardar en disco una imagen, simplemente se llama a la función:\\
+		\verb|  cv::imwrite("nombre.ext", img);|
+
+		Las imágenes a color se consideran en orden BGR.
+
+		Se puede utilizar un parámetro adicional para especificar opciones específicas del formato de imagen, como ser la compresión.
+
+	\item Video:\\
+		La clase \tc{cv::VideoCapture} proporciona una interfaz para capturar video desde una cámara o desde archivo.\\
+		\verb|  cv::VideoCapture video(0);| (cámara por defecto)\\
+		\verb|  cv::VideoCapture video("archivo.ext");| (lee desde un archivo de video)\\
+		\verb|  cv::VideoCapture video("img%02d.jpg");| (lee una secuencia de imágenes: \tc{img00.jpg}, \tc{img01.jpg}, \ldots)
+
+		Para obtener el siguiente fotograma, simplemente se utiliza\\
+		\verb|  video >> frame;|\\
+		donde \tc{frame} es de tipo \tc{cv::Mat}
+
+		La cantidad de canales de la imagen dependerá del dispositivo de captura, pudiendo luego convertirse mediante la función \tc{cv::cvtColor()}
+\end{itemize}
+
+		\subsection{Copia}
+			Las imágenes son representadas mediante una cabecera, que contiene información como el tamaño y tipo de la imagen, y un puntero inteligente que apunta a la zona de memoria donde están almacenados los píxeles.
+
+			Al utilizar el operador de asignación o el constructor de copia, se copian la cabecera y el valor del puntero. Es decir, se realiza una \emph{shallow copy}. Este comportamiento se asemeja al que se observa en los objetos de \emph{java}, \emph{python} o \emph{smalltalk}.
+
+			Como consecuencia, si se pasa una \tc{cv::Mat} como parámetro a una función, es prácticamente indistinto si el pasaje es por copia o referencia.
+			Cualquier cambio en el parámetro de la función se verá reflejado en la variable usada en la llamada (excepto realocaciones).
+
+			Si se requiere trabajar con una copia verdadera (una \emph{deep copy}), se deberán utilizar los comandos \tc{clone()} o \tc{copyTo()}\\
+			\verb|  b = a.clone();|\\
+			\verb|  c.copyTo(d);|
+
+	%\section{Funciones adicionales}
+	\section{Ejemplo completo}
+\begin{lstlisting}
+#include <opencv2/opencv.hpp>
+
+int main(int argc, char **argv){
+  cv::VideoCapture capture(0); //cámara por defecto
+  if(not capture.isOpened()) //error
+    return 1;
+  cv::Mat frame, edge;
+
+  do{
+    capture>>frame;  //siguiente fotograma
+    cv::cvtColor(frame, edge, CV_BGR2GRAY); //conversión a escala de grises
+    cv::GaussianBlur(edge, edge, cv::Size(11,11), 2.5, 0.5); //reducción de ruido
+    cv::Canny(edge, edge, 0, 30, 3); //detección de bordes
+    cv::imshow("original", frame);
+    cv::imshow("borde", edge);
+  }while( cv::waitKey(30)==-1 ); //salir cuando se presione una tecla
+
+  return 0;
+}
+\end{lstlisting}
+	\section{Diferencias con CImg}
+		Algunas diferencias que podrían afectar el cursado
+		\begin{itemize}
+			\item \tc{OpenCV} no soporta el formato \tc{gif}. Puede utilizarse el programa \tc{imagemagick} o similar para convertir a un formato manejable (como ser \tc{tiff}).\\
+				\verb|  convert archivo.gif archivo.tiff|
+			\item \tc{OpenCV} maneja las representaciones de color \tc{HSV} y \tc{HLS}, pero no \tc{HSI}.
+			\item Una ventana puede mostrar solo una imagen a la vez.
+		\end{itemize}
+	\section{Comentarios finales}
+		Este documento es de libre distribución y reproducción total o parcial por cualquier medio. Comentarios y sugerencias a los contactos de pdi-fich.wikidot.com.
+
+	\mainmatter
+	\let\thesection\theoldsection
+\chapter{Operatoria básica}
+	\begin{itemize}
+		\item Carga: comando \verb|cv::imread()|
+			Se especifica si se quiere escala de grises o a color (BGR),
+			y la profundidad (8 bits por defecto)
+
+		\item Formato: los píxeles se almacenan en posiciones contiguas de memoria,
+			siguiendo el orden de las filas.
+			Toda la información de un píxel se encuentra contigua,
+			es decir los canales se encuentran intercalados (\emph{interleaved})
+			B1G1R1B2G2R2\ldots
+
+		\item Información estadística
+			\verb|cv::meanStdDev(), cv::minMaxLoc(), cv::Size::area()|
+
+		\item Visualización
+			\verb|cv::namedWindow(), cv::imshow()|
+			Se crea una ventana a la que luego se refiere por el nombre.
+			Indica cómo actua una operación de \emph{resize}: no hacer nada, mantener aspecto.
+
+			Sólo se permite una imagen por ventana, la imagen debe ser de escala de grises o color en BGR,
+			y los valores de los píxeles deben encontrarse en el rango $[0,1]$ para flotantes (si son enteros toma todo el rango)
+
+		\item Gráficos: existen funciones para dibujar líneas y poligonales
+			%que la cátedra provea pdi::plot()
+			%https://code.google.com/p/cvplot/
+
+		\item Operaciones puntuales: puede tratarse a la matriz como un todo,
+			siendo las operaciones aplicadas por igual a todos los píxeles (eficiente).
+			O puede recorrerse mediante un bucle y acceder a los píxeles individualmente \verb|.at<T>()|
+
+		\item Copia: debido a que internamente se usan punteros inteligentes, \emph{asignación no es copia}.
+			Para copiar se debe utilizar el comando \verb|.clone()|, lo cual creará una nueva imagen.
+
+			Si lo que se desea es igualar los valores de los píxeles, se usa el comando \verb|.copyTo()|,
+			pero el destino debe tener suficiente capacidad, caso contrario creará una nueva imagen.
+			Además, permite el uso de una máscara para establecer los píxeles a copiar.
+
+		\item Región de interés (ROI):
+			OpenCV permite construir una imagen a partir de una región en otra.
+			Es una operación muy eficiente ya que no hay ninguna copia involucrada,
+			sino simplemente la creación de una cabecera para interactuar con la región.
+			\verb|cv::Mat::operator()|
+
+			Esta región puede delimitarse mediante el rango de filas y columnas que abarca,
+			o mediante un rectángulo.
+			Debe tenerse especial cuidado en que el rectángulo es geométrico,
+			por lo que trabaja en coordenadas (x,y) que no es equivalente a (fila, columna), sino a
+			\[
+				x = \mathrm{col}\qquad
+				y = \mathrm{TotalRows}-\mathrm{row}
+			\]
+			\begin{lstlisting}
+roi = image(
+  cv::Range(f_inic, f_fin), //filas
+  cv::Range(c_inic, c_fin) //columnas
+);
+roi = image(
+  cv::Rect(x,y, ancho, alto)
+);
+			\end{lstlisting}
+	\end{itemize}
+
+	\section{Callbacks}
+		Mediante el módulo HighGUI, OpenCV provee interfaces para la creación de \emph{trackbars},
+		manejar eventos del ratón y comandos del teclado.
+
+		\begin{itemize}
+			\item Trackbars:
+			Los trackbars se asocian a una ventana mediante \verb|cv::createTrackbar()|,
+			se establece una variable a modificar, el rango en que actúa, y es posible asignarle un callback.
+
+			La variable que afectan es de tipo \verb|int|,
+			pero es posible usarla de paso intermedio y obtener un valor flotante
+			mediante una función de escalado.
+
+		\item Eventos del ratón \verb|cv::setMouseCallback()|:
+			Puede consultarse el estado de los botones.
+
+			Salvedad: una matriz tiene filas y columnas,
+			el punto fila=0, columna=0 corresponde a la esquina superior izquierda.
+			Cuando se trabaja con el mouse o con figuras geométricas (\verb|cv::Point|),
+			se establece un sistema coordenado (x,y) donde el punto (0,0) corresponde a la esquina inferior izquierda. Así, se tiene la equivalencia
+			\[
+				x = \mathrm{col}\qquad
+				y = \mathrm{TotalRows}-\mathrm{row}
+			\]
+
+		\item Eventos del teclado:
+			No están asociados a ninguna ventana en particular.
+			\verb|cv::waitKey()|
+
+		\end{itemize}
+\chapter{Operaciones puntuales}
+	OpenCV provee de sobrecarga de operadores que corresponden a operaciones de matrices.
+	%OpenCV provee de sobrecarga de operadores que traducen las operaciones efectuadas en la matriz
+	%a operaciones equivalentes en cada píxel.
+
+	Con esto hay que considerar
+	\begin{itemize}
+		\item \verb|A*B| donde tanto \texttt{A} como \texttt{B} son \texttt{cv::Mat}
+			realiza una multiplicación de matrices %(sólo con flotantes o complejos). TODO
+			Para multiplicar píxel a píxel se utiliza la función \verb|cv::multiply()|
+			o \verb|.mul()|
+
+		\item \verb|CV_64FC(2)| no refiere a una matriz de complejos, sino a una matriz de dos canales.
+			Al aplicar \verb|cv::multiply()| se opera en cada canal por separado.
+			Usar \verb|cv::mulSpectrum()| si se quiere operar como complejo (con posibilidad de usar el conjugado).
+	\end{itemize}
+
+	\section{Aplicación de una LUT}
+		En caso de que la imagen sea de 8bits se puede utilizar una LUT para realizar operaciones.
+		\verb|cv::LUT( image, lut, transform );|
+
+	\section{Ruido}
+		\verb|cv::randn(), cv::randu()|
+
+	\section{Umbralizado}
+		\verb|cv::threshold()|
+		También pueden ocuparse operadores relacionales \verb|<,>|
+
+		Una vez que se tiene la máscara, se puede extraer los píxeles de interés mediante \verb|.copyTo()|
+
+\chapter{Filtrado espacial}
+	Debido a que la librería es bastante genérica, se proveen \emph{wrappers} para el cálculo de histogramas y la convolución y funciones para graficar.
+
+	Ecualización \verb|equalizeHist()|
+
+	Comparación \verb|compareHist()|, como función de distancia puede utilizarse la correlación.
+
+	Para obtener kernel gaussiano \verb|cv::getGaussianKernel(size, sigma, CV_32F)|. Esto genera un vector, entonces se aplica el producto externo para obtener la matriz.
+
+	Convolución con \verb|filter2D()|.
+	También se puede utilizar \verb|sepFilter2D()| trabajando con filtros 1D.
+
+	Filtrado gaussiano \verb|GaussianBlur()|
+	%puede conseguirse un sigma ``óptimo'' si se dejan sigmaX y sigmaY como 0.
+
+
+\chapter{Color}
+	OpenCV no soporta el modelo HSI sino el HSV.
+	Para cambiar entre modelos
+
+	\begin{lstlisting}
+cvtColor(in, out, CV_BGR2HSV)
+cvtColor(in, out, CV_HSV2BGR)
+	\end{lstlisting}
+
+	Las imágenes a color que se obtienen de archivos o dispositivos de capturan, o las que se usan en la visualización, se encuentran en el modelo BGR.
+	En almacenamiento, se tiene la terna bgr correspondiente al píxel 0, y luego la terna bgr correspondiente al píxel 1.
+	
+	Para acceder a estos valores se puede utilizar la función \verb|at()| donde el parámetro de tipo de dato será \verb|Vec3b|
+
+	Para trabajar con los canales por separado, se tiene la función \verb|split()|
+	y luego usar \verb|merge()| para volverlos a unir.
+
+	La conversión BGR2HSV tiene pérdida si se trabaja con 8bits, no así en 32 bits.
+
+	En HSV 8bits, el $hue = [0; 180)$, para su correspondencia en grados se multiplica por $2$, sino abarca el rango $[0; 360)$
+
+	Se provee la función \verb|pdi::load_colormap()| para cargar la paleta de colores, luego utilizar \verb|cv::LUT()| para aplicarla.
+
+\chapter{Filtrado frecuencial}
+	Proceso de filtrado:
+	\begin{enumerate}
+		\item convertir a 32F o 64F: \verb|image.convertTo(image, CV_32F, 1./255)|
+		\item ajustar tamaño para que las operaciones sean más eficientes %funciona sin esto
+			\verb|cv::getOptimalDFTSize()|\\
+			\verb|cv::copyMakeBorder()|
+			\begin{lstlisting}
+cv::copyMakeBorder( //relleno con 0
+	image,
+	bigger, //puede ser inplace
+	0, cv::getOptimalDFTSize(image.rows)-image.rows,
+	0, cv::getOptimalDFTSize(image.cols)-image.cols,
+	cv::BORDER_CONSTANT
+);
+			\end{lstlisting}
+		%\item hacer compleja %no hace falta
+		%	\verb|cv::merge()|
+		\item realizar la transformación
+			\verb|cv::dft()|
+			\begin{itemize}
+				\item DFT\_COMPLEX\_OUTPUT si se quiere analizar el espectro,
+					sino se utiliza un formato intercalado para almacenar la salida (más eficiente)
+				\item DFT\_SCALE divide por el número de píxeles
+				\item DFT\_REAL\_OUTPUT si en la transformación directa se usó DFT\_COMPLEX\_OUTPUT %(ver cuándo falla)
+
+			\end{itemize}
+		\item aplicar el filtro (que debe estar descentrado, al igual que el espectro)
+			\verb|cv::mulSpectrums()|
+		\item antitransformar
+			\verb|cv::idft()| o
+			\verb|cv::dft(DFT_INVERSE)|
+		\item eliminar relleno (ROI)
+	\end{enumerate}
+
+	Para la visualización se requiere centrar el espectro intercambiando los cuadrantes
+	\verb|pdi::centre()|
+	%(cátedra provee) (¿no se puede evitar la copia?)
+
+polarToCart(), cartToPolar()
+	moverse entre $x+jy$ y $\rho|\theta$.
+	no utilizar la misma matriz %(ver bien esto)
+
+%fft
+%	dft(DFT_SCALE)
+%	idft() o dft(DFT_INVERSA)
+%	REAL_OUTPUT si se está completamente seguro (como que K-On es el nombre de la banda) (me dio compleja ¡¿?!)
+%	COMPLEX_OUTPUT evitar CSS, si se quiere analizar el espectro
+%	ser cuidadoso con los tipos de datos. Trabajar en complejo.
+%	Relleno del borde con 0 (habría que eliminarlo después)
+%	ver para ocupar fftw3
+
+	\section{Funciones para el cálculo de la TDF}
+	\verb|dft() idft()|
+
+	Recibe como parámetros la imagen de entrada y donde se almacenará el resultado, además de banderas que controlan el comportamiento.
+
+	Con dft se puede realizar tanto la transformada directa (flag DFT\_SCALE) o inversa (flag DFT\_INVERSE)
+	que se encargará de realizar el escalado correspondiente.
+
+	Para operar con estas funciones se requiere una representación de punto flotante (CV\_32F o CV\_64F)
+
+	Si bien la transformada opera en el plano complejo, se puede forzar que el resultado sea real (si se está seguro de que la entrada es simétrica conjugada) mediante DFT\_REAL\_OUTPUT
+
+	Al realizar los filtros se trabaja en el espacio complejo, forzar con DFT\_COMPLEX\_OUTPUT
+
+
+	\section{Relleno}
+	Con el fin de realizar el cálculo de forma eficiente, se realiza un relleno con 0 a la imagen de entrada.
+
+		\verb|rows = cv::getOptimalDFTSize(image.rows),|\\
+		\verb|cols = cv::getOptimalDFTSize(image.cols);|\\
+	\verb|cv::copyMakeBorder(image, result, 0, rows-image.rows, 0, cols-image.cols, cv::BORDER_CONSTANT, cv::Scalar::all(0));|
+
+	\section{Definición de filtros en el plano frecuencial}
+	Se pueden definir filtros al especificar la magnitud de su espectro.
+	Luego, para aplicarlos simplemente se multiplican los espectros del filtro y la imagen.
+	Como se está operando en f, se trata de imágenes complejas.
+
+	Para crear la imagen compleja del filtro se tiene
+	
+	especificación de la magnitud.
+	fase 0
+
+	\verb|cv::polarToCart(magnitud, phase, x[0], x[1]);|\\
+	\verb|cv::merge(x, 2, result);|
+
+	Luego, para combinar
+	\verb|mulSpectrums()|
+	(si es justo y necesario, poner el flag en 0)
+
+
+	\section{Visualizado}
+	La imagen de la transformación se encuentra descentrada y es compleja.
+	Para centrarla, simplemente se definen 4 rois correspondientes a los cuadrantes y se intercambian según la diagonal.
+	realizar el intercambio usando \verb|.copyTo()|
+
+	Como la imagen es compleja no puede visualizarse con \verb|imshow()|. Lo que se visualiza es el logaritmo de su espectro (sumar un offset para evitar calcular $\log(0)$)
+
+	cv::Mat planes[2];
+	cv::split(image, planes);
+
+	cv::Mat result;
+	cv::magnitude(planes[0], planes[1], result);
+	result += 1;
+	cv::log(result, result);
+
+
+
+	\chapter{Restauración}
+		\section{Generación de números aleatorios}
+			OpenCV provee funciones \verb|randn()| y \verb|randu()| para distribución normal y uniforme, que llenan toda la matriz de una vez.
+
+			C++11 provee clases para distribuciones uniforme, normal, gamma, bernoulli, exponencial. Reciben como parámetro un RNG.
+			Recorrer las matrices elemento a elemento para llenarlas.
+
+			Al sumar la imagen con el ruido se puede superar el rango, se provee la función \verb|pdi::clamp()| para ajustar a los valores extremos.
+
+		\section{Filtros}
+			\verb|cv::norm()| para el cálculo de ECM.
+
+			\verb|cv::medianBlur()| para el filtro de mediana.
+
+			Para los de orden también se puede definir una ROI y utilizar \verb|.reshape()| para transformalo en un vector que se puede aplicar \verb|std::sort()|
+
+		\section{Periódico}
+			\verb|cv::circle()| y \verb|cv::rectangle()| para dibujar
+
+			se provee la función \verb|pdi::centre()| para desplazar el filtro (o centrar el espectro)
+
+	\chapter{Segmentación}
+		Para definir las máscaras puede usarse \verb|Matx22f()| \verb|Matx33f()| que permiten introducir los valores de los píxeles.
+
+		%Se tienen funciones para Sobel y Laplaciano.
+
+		Umbralizado con \verb|threshold()|
+
+
+		Para crecimiento de regiones se tiene la función \verb|floodfill()| que también permite generar una máscara
+
+		Existe una versión de Hough que ya determina los puntos de inicio y fin de los segmentos
+	\chapter{Morfología}
+		Funciones \verb|dilate()| y \verb|erode()|
+
+		Creación de máscaras con \verb|Matx22f()| \verb|Matx33f()|, o \verb|Mat_| y usando \verb|operator<<|
+		\begin{lstlisting}
+Mat C = (Mat_<double>(3,3) <<
+	0, 1, 0,
+	1, 1, 1,
+	0, 1, 0
+)
+		\end{lstlisting}
+
+
+\end{document}
+
